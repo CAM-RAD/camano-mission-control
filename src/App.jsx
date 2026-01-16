@@ -770,12 +770,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 pb-20">
-      {/* Header */}
-      <div className="bg-slate-700 text-white p-4">
-        <h1 className="text-xl font-bold text-center" style={{ fontFamily: 'Orbitron, sans-serif' }}>
-          CAMANO MISSION CONTROL
-        </h1>
-      </div>
+      {/* Header Banner */}
+      <header className="shadow-lg">
+        <img src="/banner.png" alt="CAMANO Sales Mission Control" className="w-full" />
+      </header>
 
       {/* Content */}
       <div className="p-4 max-w-4xl mx-auto">
@@ -814,6 +812,11 @@ export default function App() {
             onRefresh={loadData}
           />
         )}
+      </div>
+
+      {/* Version Footer */}
+      <div className="text-center text-xs text-slate-400 pb-24 mt-8">
+        v{APP_VERSION} | {BUILD_DATE}
       </div>
 
       {/* Bottom Nav */}
