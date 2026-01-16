@@ -262,11 +262,8 @@ function ImportPanel({ onImportComplete, imports, onRefresh }) {
         const text = await file.text()
         const data = JSON.parse(text)
 
-        // Validate structure
-        const userName = data.userName || data.exportedBy
-        if (!userName) {
-          throw new Error('Invalid file: missing userName or exportedBy')
-        }
+        // Get user name from various possible fields
+        const userName = data.userName || data.exportedBy || data.name || `Import ${new Date().toLocaleDateString()}`
 
         // Find or create team member
         const member = await findOrCreateTeamMember(userName)
