@@ -15,7 +15,7 @@ import {
 } from './lib/supabase'
 
 // App version
-const APP_VERSION = '1.0.0'
+const APP_VERSION = '1.0.1'
 const BUILD_DATE = '2026-01-16'
 
 // Pixel art icon component
