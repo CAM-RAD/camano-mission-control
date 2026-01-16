@@ -12,7 +12,8 @@ A manager dashboard that imports JSON exports from CAMANO Sales Tracker and aggr
 
 ## Deployment
 
-**Live URL:** TBD (deploy to Netlify)
+**Live URL:** https://camano-mission-control.netlify.app
+**GitHub:** https://github.com/CAM-RAD/camano-mission-control
 **Database:** Supabase (PostgreSQL)
 
 ### Environment Variables
