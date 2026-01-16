@@ -15,7 +15,7 @@ import {
 } from './lib/supabase'
 
 // App version
-const APP_VERSION = '1.0.1'
+const APP_VERSION = '1.0.2'
 const BUILD_DATE = '2026-01-16'
 
 // Pixel art icon component
@@ -241,6 +241,8 @@ function ImportPanel({ onImportComplete, imports, onRefresh }) {
   const [importing, setImporting] = useState(false)
   const [message, setMessage] = useState(null)
   const [selectedMember, setSelectedMember] = useState('all')
+  const [confirmDelete, setConfirmDelete] = useState(null)
+  const [expandedImport, setExpandedImport] = useState(null)
 
   const handleDrop = useCallback(async (e) => {
     e.preventDefault()
@@ -283,7 +285,11 @@ function ImportPanel({ onImportComplete, imports, onRefresh }) {
   }, [onImportComplete])
 
   const handleRestore = async (importId) => {
-    if (!confirm('Restore this import? This will replace current data for this team member.')) return
+    if (confirmDelete !== `restore-${importId}`) {
+      setConfirmDelete(`restore-${importId}`)
+      return
+    }
+    setConfirmDelete(null)
 
     try {
       await restoreImport(importId)
@@ -295,7 +301,11 @@ function ImportPanel({ onImportComplete, imports, onRefresh }) {
   }
 
   const handleDelete = async (importId) => {
-    if (!confirm('Delete this import? This cannot be undone.')) return
+    if (confirmDelete !== `delete-${importId}`) {
+      setConfirmDelete(`delete-${importId}`)
+      return
+    }
+    setConfirmDelete(null)
 
     try {
       await deleteImport(importId)
@@ -311,6 +321,16 @@ function ImportPanel({ onImportComplete, imports, onRefresh }) {
     : imports.filter(i => i.team_member_id === selectedMember)
 
   const uniqueMembers = [...new Map(imports.map(i => [i.team_member_id, i.team_members?.name])).entries()]
+
+  // Get source info from raw_data
+  const getSourceInfo = (imp) => {
+    const raw = imp.raw_data || {}
+    return {
+      userName: raw.userName || '',
+      exportedBy: raw.exportedBy || '',
+      exportedAt: raw.exportedAt || ''
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -379,45 +399,124 @@ function ImportPanel({ onImportComplete, imports, onRefresh }) {
               No imports yet
             </div>
           ) : (
-            filteredImports.map(imp => (
-              <div key={imp.id} className="p-4 flex items-center justify-between">
-                <div>
-                  <div className="font-medium text-slate-800">
-                    {imp.team_members?.name}
-                    {imp.is_current && (
-                      <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">
-                        Current
-                      </span>
-                    )}
+            filteredImports.map(imp => {
+              const source = getSourceInfo(imp)
+              const isExpanded = expandedImport === imp.id
+              const prospects = imp.raw_data?.prospects || []
+
+              return (
+                <div key={imp.id} className="border-b border-slate-100 last:border-b-0">
+                  <div className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="font-medium text-slate-800">
+                          {imp.team_members?.name}
+                          {imp.is_current && (
+                            <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">
+                              Current
+                            </span>
+                          )}
+                        </div>
+                        {source.userName && source.userName !== imp.team_members?.name && (
+                          <div className="text-xs text-blue-600 mt-0.5">
+                            Source account: {source.userName}
+                          </div>
+                        )}
+                        <div className="text-sm text-slate-500 mt-1">
+                          Imported: {formatDateTime(imp.imported_at)}
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          Exported: {formatDateTime(imp.exported_at)}
+                        </div>
+                        <div className="text-xs text-slate-500 mt-1">
+                          {imp.activity_count?.emails || 0} Emails | {imp.activity_count?.calls || 0} Calls |
+                          {imp.activity_count?.meetings || 0} Meetings | {imp.activity_count?.proposals || 0} Proposals |
+                          {imp.prospect_count || 0} Prospects
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2 ml-4">
+                        <button
+                          onClick={() => setExpandedImport(isExpanded ? null : imp.id)}
+                          className="px-3 py-1 bg-slate-100 text-slate-700 rounded hover:bg-slate-200 text-sm"
+                        >
+                          {isExpanded ? 'Hide' : 'View'}
+                        </button>
+                        {!imp.is_current && (
+                          <button
+                            onClick={() => handleRestore(imp.id)}
+                            className={`px-3 py-1 rounded text-sm ${
+                              confirmDelete === `restore-${imp.id}`
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                            }`}
+                          >
+                            {confirmDelete === `restore-${imp.id}` ? 'Confirm' : 'Restore'}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(imp.id)}
+                          className={`px-3 py-1 rounded text-sm ${
+                            confirmDelete === `delete-${imp.id}`
+                              ? 'bg-red-600 text-white'
+                              : 'bg-red-100 text-red-700 hover:bg-red-200'
+                          }`}
+                        >
+                          {confirmDelete === `delete-${imp.id}` ? 'Confirm' : 'Delete'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-sm text-slate-500">
-                    Imported: {formatDateTime(imp.imported_at)} |
-                    Exported: {formatDateTime(imp.exported_at)}
-                  </div>
-                  <div className="text-xs text-slate-400 mt-1">
-                    {imp.activity_count?.emails || 0}E / {imp.activity_count?.calls || 0}C /
-                    {imp.activity_count?.meetings || 0}M / {imp.activity_count?.proposals || 0}P |
-                    {imp.prospect_count || 0} prospects
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  {!imp.is_current && (
-                    <button
-                      onClick={() => handleRestore(imp.id)}
-                      className="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 text-sm"
-                    >
-                      Restore
-                    </button>
+
+                  {/* Expanded Details */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 bg-slate-50">
+                      <div className="border-t border-slate-200 pt-4">
+                        <h4 className="font-bold text-slate-700 mb-3" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+                          Prospects ({prospects.length})
+                        </h4>
+                        {prospects.length === 0 ? (
+                          <p className="text-sm text-slate-400 italic">No prospects in this import</p>
+                        ) : (
+                          <div className="space-y-2 max-h-96 overflow-y-auto">
+                            {prospects.map((p, idx) => (
+                              <div key={idx} className="bg-white rounded-lg p-3 border border-slate-200">
+                                <div className="flex justify-between items-start">
+                                  <div>
+                                    <div className="font-medium text-slate-800">{p.company}</div>
+                                    <div className="text-sm text-slate-600">{p.contact}</div>
+                                    {p.email && <div className="text-xs text-slate-500">{p.email}</div>}
+                                    {p.phone && <div className="text-xs text-slate-500">{p.phone}</div>}
+                                  </div>
+                                  <div className="text-right">
+                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                      p.stage === 'won' ? 'bg-green-100 text-green-700' :
+                                      p.stage === 'lost' ? 'bg-red-100 text-red-700' :
+                                      'bg-slate-100 text-slate-700'
+                                    }`}>
+                                      {p.stage}
+                                    </span>
+                                    {p.dealValue > 0 && (
+                                      <div className="text-sm text-green-600 mt-1">
+                                        {formatCurrency(p.dealValue)}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                {p.notes && p.notes.length > 0 && (
+                                  <div className="mt-2 text-xs text-slate-500 bg-slate-50 p-2 rounded">
+                                    Notes: {Array.isArray(p.notes) ? p.notes.join(', ') : p.notes}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
-                  <button
-                    onClick={() => handleDelete(imp.id)}
-                    className="px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 text-sm"
-                  >
-                    Delete
-                  </button>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
       </div>
