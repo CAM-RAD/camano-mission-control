@@ -15,7 +15,7 @@ import {
 } from './lib/supabase'
 
 // App version
-const APP_VERSION = '1.0.2'
+const APP_VERSION = '1.0.3'
 const BUILD_DATE = '2026-01-16'
 
 // Pixel art icon component
@@ -524,9 +524,96 @@ function ImportPanel({ onImportComplete, imports, onRefresh }) {
   )
 }
 
+// ============ CONTACT DETAIL MODAL ============
+function ContactModal({ prospect, onClose }) {
+  if (!prospect) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="p-4 border-b border-slate-100 flex justify-between items-start">
+          <div>
+            <h3 className="text-lg font-bold text-slate-800" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+              {prospect.company}
+            </h3>
+            <p className="text-sm text-slate-600">{prospect.contact}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <PixelIcon name="close" size={24} />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {/* Stage & Value */}
+          <div className="flex justify-between items-center">
+            <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+              prospect.stage === 'won' ? 'bg-green-100 text-green-700' :
+              prospect.stage === 'lost' ? 'bg-red-100 text-red-700' :
+              'bg-slate-100 text-slate-700'
+            }`}>
+              {prospect.stage}
+            </span>
+            {prospect.deal_value > 0 && (
+              <span className="text-lg font-bold text-green-600">
+                {formatCurrency(prospect.deal_value)}
+              </span>
+            )}
+          </div>
+
+          {/* Contact Info */}
+          <div className="space-y-2">
+            {prospect.email && (
+              <div className="flex items-center gap-2 text-sm">
+                <PixelIcon name="mail" size={16} className="opacity-60" />
+                <a href={`mailto:${prospect.email}`} className="text-blue-600 hover:underline">
+                  {prospect.email}
+                </a>
+              </div>
+            )}
+            {prospect.phone && (
+              <div className="flex items-center gap-2 text-sm">
+                <PixelIcon name="headset" size={16} className="opacity-60" />
+                <a href={`tel:${prospect.phone}`} className="text-blue-600 hover:underline">
+                  {prospect.phone}
+                </a>
+              </div>
+            )}
+          </div>
+
+          {/* Owner */}
+          <div className="bg-slate-50 rounded-lg p-3">
+            <div className="text-xs text-slate-500 mb-1">Owned by</div>
+            <div className="font-medium text-slate-800">{prospect.team_members?.name || 'Unknown'}</div>
+          </div>
+
+          {/* Dates */}
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <div className="text-xs text-slate-500">Created</div>
+              <div className="text-slate-700">{formatDate(prospect.created_at)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-slate-500">Last Touch</div>
+              <div className="text-slate-700">{formatDate(prospect.last_touch)}</div>
+            </div>
+            {prospect.won_at && (
+              <div className="col-span-2">
+                <div className="text-xs text-slate-500">Won Date</div>
+                <div className="text-green-600 font-medium">{formatDate(prospect.won_at)}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ============ TEAM PIPELINE ============
 function TeamPipeline({ prospects, teamMembers }) {
   const [filterMember, setFilterMember] = useState('all')
+  const [search, setSearch] = useState('')
+  const [selectedProspect, setSelectedProspect] = useState(null)
 
   const stages = ['cold', 'contacted', 'meeting', 'proposal', 'won', 'lost']
   const stageColors = {
@@ -538,9 +625,21 @@ function TeamPipeline({ prospects, teamMembers }) {
     lost: 'bg-red-50 border-red-200'
   }
 
-  const filtered = filterMember === 'all'
+  // Filter by member
+  let filtered = filterMember === 'all'
     ? prospects
     : prospects.filter(p => p.team_member_id === filterMember)
+
+  // Filter by search
+  if (search.trim()) {
+    const s = search.toLowerCase()
+    filtered = filtered.filter(p =>
+      p.company?.toLowerCase().includes(s) ||
+      p.contact?.toLowerCase().includes(s) ||
+      p.email?.toLowerCase().includes(s) ||
+      p.phone?.toLowerCase().includes(s)
+    )
+  }
 
   const byStage = stages.reduce((acc, stage) => {
     acc[stage] = filtered.filter(p => p.stage === stage)
@@ -563,6 +662,18 @@ function TeamPipeline({ prospects, teamMembers }) {
             <option key={m.id} value={m.id}>{m.name}</option>
           ))}
         </select>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <PixelIcon name="search" size={20} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" />
+        <input
+          type="text"
+          placeholder="Search prospects..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:border-slate-400 focus:outline-none"
+        />
       </div>
 
       {/* Pipeline Stages */}
@@ -592,7 +703,8 @@ function TeamPipeline({ prospects, teamMembers }) {
                   {stageProspects.map(p => (
                     <div
                       key={p.id}
-                      className="bg-white rounded-lg px-3 py-2 shadow-sm border border-slate-200"
+                      onClick={() => setSelectedProspect(p)}
+                      className="bg-white rounded-lg px-3 py-2 shadow-sm border border-slate-200 cursor-pointer hover:border-slate-400 hover:shadow transition-all"
                     >
                       <div className="font-medium text-slate-800 text-sm">{p.company}</div>
                       <div className="text-xs text-slate-500">{p.contact}</div>
@@ -612,6 +724,176 @@ function TeamPipeline({ prospects, teamMembers }) {
           )
         })}
       </div>
+
+      {/* Contact Modal */}
+      {selectedProspect && (
+        <ContactModal prospect={selectedProspect} onClose={() => setSelectedProspect(null)} />
+      )}
+    </div>
+  )
+}
+
+// ============ CONTACTS LIST ============
+function ContactsList({ prospects, teamMembers }) {
+  const [search, setSearch] = useState('')
+  const [filterMember, setFilterMember] = useState('all')
+  const [filterStage, setFilterStage] = useState('all')
+  const [selectedProspect, setSelectedProspect] = useState(null)
+
+  const stages = ['cold', 'contacted', 'meeting', 'proposal', 'won', 'lost']
+
+  // Apply filters
+  let filtered = prospects
+
+  if (filterMember !== 'all') {
+    filtered = filtered.filter(p => p.team_member_id === filterMember)
+  }
+
+  if (filterStage !== 'all') {
+    filtered = filtered.filter(p => p.stage === filterStage)
+  }
+
+  if (search.trim()) {
+    const s = search.toLowerCase()
+    filtered = filtered.filter(p =>
+      p.company?.toLowerCase().includes(s) ||
+      p.contact?.toLowerCase().includes(s) ||
+      p.email?.toLowerCase().includes(s) ||
+      p.phone?.toLowerCase().includes(s)
+    )
+  }
+
+  // Find potential duplicates (same company name, different owners)
+  const companyCount = {}
+  prospects.forEach(p => {
+    const key = p.company?.toLowerCase().trim()
+    if (key) {
+      if (!companyCount[key]) companyCount[key] = []
+      companyCount[key].push(p.team_member_id)
+    }
+  })
+  const duplicateCompanies = new Set(
+    Object.entries(companyCount)
+      .filter(([_, ids]) => new Set(ids).size > 1 || ids.length > 1)
+      .map(([company]) => company)
+  )
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-slate-800" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+        Contacts
+      </h2>
+
+      {/* Search & Filters */}
+      <div className="space-y-3">
+        <div className="relative">
+          <PixelIcon name="search" size={20} className="absolute left-3 top-1/2 -translate-y-1/2 opacity-40" />
+          <input
+            type="text"
+            placeholder="Search by company, contact, email, phone..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:border-slate-400 focus:outline-none"
+          />
+        </div>
+
+        <div className="flex gap-3">
+          <select
+            value={filterMember}
+            onChange={(e) => setFilterMember(e.target.value)}
+            className="flex-1 border border-slate-200 rounded-lg px-3 py-2"
+          >
+            <option value="all">All Team Members</option>
+            {teamMembers.map(m => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+          </select>
+
+          <select
+            value={filterStage}
+            onChange={(e) => setFilterStage(e.target.value)}
+            className="flex-1 border border-slate-200 rounded-lg px-3 py-2"
+          >
+            <option value="all">All Stages</option>
+            {stages.map(s => (
+              <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Duplicate Warning */}
+      {duplicateCompanies.size > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+          <strong>Potential duplicates detected:</strong> {duplicateCompanies.size} companies appear multiple times
+        </div>
+      )}
+
+      {/* Results Count */}
+      <div className="text-sm text-slate-500">
+        Showing {filtered.length} of {prospects.length} contacts
+      </div>
+
+      {/* Contacts List */}
+      <div className="bg-white rounded-xl shadow divide-y divide-slate-100">
+        {filtered.length === 0 ? (
+          <div className="p-8 text-center text-slate-400">
+            No contacts found
+          </div>
+        ) : (
+          filtered.map(p => {
+            const isDuplicate = duplicateCompanies.has(p.company?.toLowerCase().trim())
+
+            return (
+              <div
+                key={p.id}
+                onClick={() => setSelectedProspect(p)}
+                className={`p-4 cursor-pointer hover:bg-slate-50 transition-colors ${
+                  isDuplicate ? 'border-l-4 border-l-amber-400' : ''
+                }`}
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="font-medium text-slate-800 flex items-center gap-2">
+                      {p.company}
+                      {isDuplicate && (
+                        <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">
+                          Duplicate?
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-sm text-slate-600">{p.contact}</div>
+                    <div className="text-xs text-slate-400 mt-1">
+                      {p.email && <span className="mr-3">{p.email}</span>}
+                      {p.phone && <span>{p.phone}</span>}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                      p.stage === 'won' ? 'bg-green-100 text-green-700' :
+                      p.stage === 'lost' ? 'bg-red-100 text-red-700' :
+                      'bg-slate-100 text-slate-700'
+                    }`}>
+                      {p.stage}
+                    </span>
+                    <div className="text-xs text-slate-400 mt-1">{p.team_members?.name}</div>
+                    {p.deal_value > 0 && (
+                      <div className="text-sm text-green-600 font-medium mt-1">
+                        {formatCurrency(p.deal_value)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {/* Contact Modal */}
+      {selectedProspect && (
+        <ContactModal prospect={selectedProspect} onClose={() => setSelectedProspect(null)} />
+      )}
     </div>
   )
 }
@@ -859,6 +1141,7 @@ export default function App() {
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: 'chart-bar' },
     { id: 'import', label: 'Import', icon: 'file-plus' },
+    { id: 'contacts', label: 'Contacts', icon: 'user' },
     { id: 'pipeline', label: 'Pipeline', icon: 'trending-up' },
     { id: 'reports', label: 'Reports', icon: 'clipboard' },
     { id: 'settings', label: 'Settings', icon: 'sliders' }
@@ -886,6 +1169,12 @@ export default function App() {
             onImportComplete={loadData}
             imports={imports}
             onRefresh={loadData}
+          />
+        )}
+        {tab === 'contacts' && (
+          <ContactsList
+            prospects={prospects}
+            teamMembers={teamMembers}
           />
         )}
         {tab === 'pipeline' && (
